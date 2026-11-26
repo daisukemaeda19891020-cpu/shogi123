@@ -1,0 +1,1565 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>棋譜研究室</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: board + move list on the left, commentary/graph/summary on the right; one column on phones. Wood board is the only warm object on a cool slate page. */
+:root{
+  --bg:#edf0f3; --surface:#ffffff; --fg:#1b2430; --muted:#566677; --line:#d3dae1;
+  --accent:#2c4a8c; --accent-fg:#ffffff;
+  --board:#e2b468; --board-line:#8b6a2e; --piece:#f7e5b8; --piece-edge:#6f5120; --ink:#1d1a14; --prom:#b3261e;
+  --good:#1d7548; --good-bg:#e3f3ea; --bad:#b3261e; --bad-bg:#fbe9e7; --warn:#80540a; --warn-bg:#fff1d3;
+  --hl:rgba(44,74,140,.30); --last:rgba(255,255,255,.5);
+  --font-ui:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --font-piece:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11161c; --surface:#1a212a; --fg:#e5eaf0; --muted:#9aa8b6; --line:#2b3641;
+    --accent:#8fb0ff; --accent-fg:#0d1522;
+    --board:#b98d45; --board-line:#5b441c; --piece:#ead6a3; --piece-edge:#43331a;
+    --good:#72d49c; --good-bg:#14301f; --bad:#ff8f84; --bad-bg:#3a1b18; --warn:#ffcb66; --warn-bg:#3a2d10;
+    --hl:rgba(143,176,255,.34); --last:rgba(255,255,255,.28); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11161c; --surface:#1a212a; --fg:#e5eaf0; --muted:#9aa8b6; --line:#2b3641;
+  --accent:#8fb0ff; --accent-fg:#0d1522;
+  --board:#b98d45; --board-line:#5b441c; --piece:#ead6a3; --piece-edge:#43331a;
+  --good:#72d49c; --good-bg:#14301f; --bad:#ff8f84; --bad-bg:#3a1b18; --warn:#ffcb66; --warn-bg:#3a2d10;
+  --hl:rgba(143,176,255,.34); --last:rgba(255,255,255,.28); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:15px;line-height:1.6;
+  padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:1.35rem;margin:0;line-height:1.3}
+h2{font-size:1rem;margin:0}
+.sub{margin:2px 0 0;color:var(--muted);font-size:.88rem}
+.app{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+@media (min-width:880px){.app{grid-template-columns:minmax(0,470px) minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+details.panel summary{cursor:pointer;font-weight:700}
+textarea{width:100%;min-height:110px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit;font-size:.85rem;padding:8px;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.btn{height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-size:.9rem;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:700}
+.btn[disabled]{opacity:.45;cursor:default}
+.btn:focus-visible,.cell:focus-visible,.mv:focus-visible,.hi:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.note{font-size:.8rem;color:var(--muted)}
+.err{color:var(--bad);font-size:.88rem}
+.players{display:flex;justify-content:space-between;gap:8px;font-size:.88rem;color:var(--muted)}
+.hand{min-height:44px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 8px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-size:.78rem;color:var(--muted)}
+.hi{display:inline-flex;align-items:center;gap:2px;border:1px solid transparent;border-radius:8px;background:none;color:var(--fg);font:inherit;padding:2px 4px;cursor:default}
+.hi.mine{cursor:pointer}.hi.sel{border-color:var(--accent);background:var(--hl)}
+.hi .pc{position:static;width:28px;height:31px;font-size:19px}
+.hi.gote .pc{transform:rotate(180deg)}
+.hi b{font-size:.85rem}
+.bwrap{container-type:inline-size;display:grid;grid-template-columns:minmax(0,1fr) 1.4em;grid-template-rows:1.3em auto;font-size:.75rem;color:var(--muted)}
+.files{grid-column:1;grid-row:1;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));text-align:center}
+.ranks{grid-column:2;grid-row:2;display:grid;grid-template-rows:repeat(9,minmax(0,1fr));padding-left:.35em;align-items:center}
+.board{grid-column:1;grid-row:2;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));aspect-ratio:1/1;width:100%;background:var(--board);border:2px solid var(--board-line)}
+.cell{position:relative;min-width:0;min-height:0;overflow:hidden;padding:0;border:0;border-right:1px solid var(--board-line);border-bottom:1px solid var(--board-line);background:transparent;cursor:pointer}
+.cell:nth-child(9n){border-right:0}.cell:nth-child(n+73){border-bottom:0}
+.cell.last{background:var(--last)}.cell.sel{background:var(--hl)}
+.cell.dest::after{content:"";position:absolute;left:35%;top:35%;width:30%;height:30%;border-radius:50%;background:var(--accent);opacity:.75}
+.cell.dest.cap::after{left:6%;top:6%;width:88%;height:88%;background:transparent;border:3px solid var(--accent);border-radius:8px;opacity:1}
+.pc{position:absolute;inset:5% 9%;display:flex;align-items:center;justify-content:center;background:var(--piece);color:var(--ink);font-family:var(--font-piece);font-weight:700;font-size:5.3cqw;line-height:1;
+  clip-path:polygon(50% 0,88% 13%,100% 100%,0 100%,12% 13%);pointer-events:none}
+.pc.prom{color:var(--prom)}.pc.gote{transform:rotate(180deg)}
+.nav{display:grid;grid-template-columns:repeat(4,1fr) auto;gap:6px}
+.nav .btn{padding:0}
+.pos{font-size:.85rem;color:var(--muted);text-align:center}
+.promo{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.moves{display:flex;flex-wrap:wrap;gap:4px;max-height:10.5rem;overflow:auto}
+.mv{position:relative;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:2px 7px;font:inherit;font-size:.82rem;cursor:pointer;white-space:nowrap}
+.mv.cur{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:700}
+.mv.var{border-style:dashed;border-color:var(--warn)}
+.mv i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;background:var(--line)}
+.mv i.best,.mv i.good{background:var(--good)}.mv i.doubt{background:var(--warn)}.mv i.bad{background:var(--bad)}
+.badge{display:inline-block;font-size:.78rem;font-weight:700;padding:1px 10px;border-radius:99px}
+.badge.best,.badge.good{background:var(--good-bg);color:var(--good)}
+.badge.doubt{background:var(--warn-bg);color:var(--warn)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.card h3{margin:0;font-size:1.02rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card h4{margin:10px 0 2px;font-size:.88rem;color:var(--muted)}
+.card ul{margin:2px 0 0;padding-left:1.2em}
+.card li{margin:2px 0;overflow-wrap:anywhere}
+.card li.neg::marker{color:var(--bad)}.card li.pos::marker{color:var(--good)}
+.card p{margin:4px 0 0;overflow-wrap:anywhere}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg label{padding:6px 12px;font-size:.85rem;cursor:pointer;background:var(--surface)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input:checked+span{font-weight:700;color:var(--accent)}
+.seg label:has(input:checked){background:var(--hl)}
+.seg label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:-3px}
+svg.graph{width:100%;height:auto;display:block;cursor:pointer}
+.g-mid{stroke:var(--line);stroke-width:1}
+.g-a{fill:none;stroke:var(--accent);stroke-width:2}
+.g-b{fill:none;stroke:var(--warn);stroke-width:2;stroke-dasharray:5 3}
+.g-cur{stroke:var(--fg);stroke-width:1.5;stroke-dasharray:3 3}
+.g-t{fill:var(--muted);font-size:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:18px;height:0;border-top:3px solid var(--accent);margin-right:6px;vertical-align:middle}
+.legend .b::before{border-top:3px dashed var(--warn)}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar div{height:100%;width:0;background:var(--accent)}
+.worst{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.worst button{text-align:left}
+.stat{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.stat .badge{font-weight:400}
+.sel{height:36px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit}
+.flip .board .pc{transform:rotate(180deg)}.flip .board .pc.gote{transform:none}
+.flip .hi .pc{transform:rotate(180deg)}.flip .hi.gote .pc{transform:none}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>棋譜研究室</h1>
+    <p class="sub">棋譜を一手ずつ見ながら、なぜ良いのか・なぜ損なのかを確認できます。やねうら王と対局して、そのまま振り返ることもできます。</p>
+  </header>
+
+  <details class="panel" id="loader" open>
+    <summary>棋譜を読み込む（KIF・CSA・USIの手順）</summary>
+    <textarea id="src" placeholder="ここに棋譜のテキストを貼り付け（KIF／CSA／USI形式）。例：7g7f 3c3d 2g2f …" aria-label="棋譜のテキスト"></textarea>
+    <div class="row">
+      <button class="btn primary" id="b-load">読み込む</button>
+      <label class="btn" style="display:inline-flex;align-items:center;cursor:pointer">ファイルを選ぶ<input type="file" id="file" accept=".kif,.kifu,.csa,.txt" hidden></label>
+    </div>
+    <label class="note" for="log" style="display:block;margin-top:10px">やねうら王の解析ログ（任意）：USIの「position … moves …」と「info … score cp …」の出力</label>
+    <textarea id="log" style="min-height:70px" placeholder="例：&#10;position startpos moves 7g7f&#10;info depth 20 score cp 35 pv 3c3d 2g2f&#10;bestmove 3c3d" aria-label="やねうら王の解析ログ"></textarea>
+    <div class="row">
+      <label class="btn" style="display:inline-flex;align-items:center;cursor:pointer">解析ログのファイルを選ぶ<input type="file" id="file2" accept=".txt,.log" hidden></label>
+    </div>
+    <p class="err" id="loaderr" role="alert"></p>
+    <p class="note" id="logmsg"></p>
+    <p class="note">平手の棋譜に対応しています。評価値のコメント（「*#評価値=123」「score cp 123」など）が付いた棋譜、または解析ログから、やねうら王などの評価値をグラフ・解説・集計に表示します。解析ログだけを貼り付けても、棋譜として読み込めます。</p>
+  </details>
+
+  <details class="panel" id="match" open>
+    <summary>やねうら王と対局する</summary>
+    <div class="row">
+      <button class="btn" id="m-wasm">ブラウザ内で動かす</button>
+      <button class="btn" id="m-conn">PCのやねうら王につなぐ</button>
+    </div>
+    <p class="note" id="m-eng" role="status">エンジン：未接続</p>
+    <p class="note" id="m-iso"></p>
+    <p class="note">まずエンジンにつなぎます。PC側の接続先（ws://localhost:8765 など）は、下の「やねうら王で解析」欄で変更できます。</p>
+    <div class="row">
+      <div class="seg" role="radiogroup" aria-label="あなたの手番">
+        <label><input type="radio" name="mside" value="0" checked><span>私は先手</span></label>
+        <label><input type="radio" name="mside" value="1"><span>私は後手</span></label>
+      </div>
+      <label class="note">強さ
+        <select id="m-lvl" class="sel">
+          <option value="0">入門</option><option value="5">初級</option><option value="10" selected>中級</option><option value="15">上級</option><option value="20">最強</option>
+        </select></label>
+      <label class="note">1手あたり
+        <select id="m-time" class="sel">
+          <option value="500">0.5秒</option><option value="1000" selected>1秒</option><option value="3000">3秒</option><option value="10000">10秒</option>
+        </select></label>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="m-start" disabled>対局開始</button>
+      <button class="btn" id="m-resign" disabled>投了</button>
+      <button class="btn" id="m-retry" hidden>もう一度考えさせる</button>
+      <button class="btn" id="m-kif" disabled>棋譜を取り出す</button>
+    </div>
+    <p class="note" id="m-msg" role="status">エンジンにつなぐと「対局開始」を押せます。</p>
+    <p class="note">平手・駒落ちなしの対局です。入玉宣言（持将棋）には対応していません。終局後は「全局をやねうら王で解析」で振り返りができます。</p>
+  </details>
+
+  <div class="app">
+    <div class="col">
+      <div class="players"><span id="p-b">先手：-</span><span id="p-w">後手：-</span></div>
+      <div class="hand" id="hand-top"></div>
+      <div class="bwrap">
+        <div class="files" id="files"></div>
+        <div class="board" id="board"></div>
+        <div class="ranks" id="ranks"></div>
+      </div>
+      <div class="hand" id="hand-bot"></div>
+      <div class="promo" id="promo" hidden>
+        <span>成りますか？</span>
+        <button class="btn primary" id="promo-yes">成る</button>
+        <button class="btn" id="promo-no">成らない</button>
+      </div>
+      <div class="nav">
+        <button class="btn" id="n-first" aria-label="最初へ">⏮</button>
+        <button class="btn" id="n-prev" aria-label="一手戻る">◀</button>
+        <button class="btn" id="n-next" aria-label="一手進む">▶</button>
+        <button class="btn" id="n-last" aria-label="最後へ">⏭</button>
+        <button class="btn" id="n-main" hidden>本譜に戻る</button>
+      </div>
+      <div class="pos" id="pos"></div>
+      <div class="moves" id="moves" role="list"></div>
+    </div>
+
+    <div class="col">
+      <div class="panel card" id="card" aria-live="polite"></div>
+      <div class="panel">
+        <div class="row" style="margin-top:0">
+          <span class="note">読みの深さ</span>
+          <div class="seg" role="radiogroup" aria-label="読みの深さ">
+            <label><input type="radio" name="depth" value="2"><span>速い</span></label>
+            <label><input type="radio" name="depth" value="3" checked><span>ていねい</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="yn-panel">
+        <h2>やねうら王で解析</h2>
+        <div class="row" style="margin-top:0"><button class="btn primary" id="yn-wasm">ブラウザ内で動かす（中継なし）</button></div>
+        <p class="note" id="yn-iso"></p>
+        <p class="note">または、PCのやねうら王に中継プログラムでつなぎます：</p>
+        <div class="row">
+          <input id="yn-url" value="ws://localhost:8765" aria-label="中継プログラムの接続先" style="flex:1;min-width:10em;height:40px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit;padding:0 8px">
+          <button class="btn" id="yn-conn">つなぐ</button>
+        </div>
+        <p class="note" id="yn-status" role="status">未接続</p>
+        <div class="row">
+          <label class="note">1局面あたり
+            <select id="yn-time" style="height:36px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit">
+              <option value="500">0.5秒</option><option value="1000" selected>1秒</option><option value="3000">3秒</option><option value="10000">10秒</option>
+            </select></label>
+          <label class="note">スレッド数 <input id="yn-thr" type="number" min="1" max="64" value="2" style="width:4em;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit"></label>
+          <label class="note">ハッシュ(MB) <input id="yn-hash" type="number" min="16" max="8192" value="256" style="width:5em;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit"></label>
+        </div>
+        <div class="row">
+          <button class="btn" id="yn-one" disabled>この局面を解析</button>
+          <button class="btn primary" id="yn-all" disabled>全局をやねうら王で解析</button>
+        </div>
+        <div class="bar" id="yn-bar" hidden><div id="yn-fill"></div></div>
+        <p class="note" id="yn-prog"></p>
+      </div>
+      <div class="panel">
+        <h2>形勢グラフと弱点まとめ</h2>
+        <svg class="graph" id="graph" viewBox="0 0 600 120" role="img" aria-label="形勢の推移グラフ"></svg>
+        <div class="legend"><span>内蔵エンジン（先手から見て上が有利）</span><span class="b" id="lg-b" hidden>やねうら王などの評価値（先手から見た値）</span></div>
+        <div class="row">
+          <div class="seg" role="radiogroup" aria-label="自分の手番">
+            <label><input type="radio" name="side" value="0" checked><span>私は先手</span></label>
+            <label><input type="radio" name="side" value="1"><span>私は後手</span></label>
+          </div>
+          <button class="btn primary" id="b-all">全局を解析</button>
+        </div>
+        <div class="bar" id="bar" hidden><div id="barfill"></div></div>
+        <p class="note" id="prog"></p>
+        <div id="summary"></div>
+      </div>
+      <details class="panel">
+        <summary>やねうら王の評価値を使うには</summary>
+        <p class="note">このページの中ではやねうら王を動かせないため、将棋所やShogiGUIなどで解析した結果を取り込みます。</p>
+        <ul class="note">
+          <li>方法00（中継なし）：「ブラウザ内で動かす」は、やねうら王のWASM版（水匠の評価関数入り）をブラウザの中で動かします。ブラウザの制約で、ページが次のヘッダ付きで配信されている必要があります：<code>Cross-Origin-Opener-Policy: same-origin</code>、<code>Cross-Origin-Embedder-Policy: require-corp</code>。NetlifyやCloudflare Pagesなら、同梱の <code>_headers</code> ファイルとこのHTMLを <code>index.html</code> として置くだけで満たせます。Chrome／Firefox向けです。</li>
+          <li>方法0（いちばん手軽）：PCにやねうら王（将棋所などに入れているもの）がある場合、同梱の yane-bridge.js を使ってこのページから直接解析できます。Node.js（18以降）を入れ、ターミナルで <code>node yane-bridge.js "やねうら王の実行ファイルのパス"</code> を実行 → ページの「やねうら王で解析」で「つなぐ」→「全局をやねうら王で解析」。評価関数ファイル（eval）は、やねうら王を普段使う状態のまま（実行ファイルと同じ場所）にしておいてください。接続はChrome／Firefoxで確認する想定で、Safariはページとの接続がブロックされることがあります。</li>
+          <li>方法1：やねうら王で棋譜を解析し、評価値付きのKIFを書き出して、そのテキスト（またはファイル）を読み込む。</li>
+          <li>方法2：USIの通信ログ（「position startpos moves …」と「info … score cp …」の行）を、解析ログ欄に貼る。棋譜欄の手順と合う局面だけが反映されます。</li>
+          <li>「評価値=」のコメントは先手から見た値、「score cp」は手番側から見た値として、自動で換算します。詰みは「score mate」から読み取ります。</li>
+          <li>取り込むと、グラフの点線・各手の解説（評価値の変化、推奨手、読み筋）・弱点まとめ・手順リストの色の点に反映されます。</li>
+          <li>評価値コメントの書式はソフトごとに違うので、読み取れないときは書式を教えてください。</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHOGI = (() => {
+  const HAND_TYPES = ['R','B','G','S','N','L','P'];
+  const ZEN = ['','１','２','３','４','５','６','７','８','９'];
+  const KAN = ['','一','二','三','四','五','六','七','八','九'];
+  const NAME = {P:'歩',L:'香',N:'桂',S:'銀',G:'金',B:'角',R:'飛',K:'玉'};
+  const PNAME = {P:'と',L:'成香',N:'成桂',S:'成銀',B:'馬',R:'龍'};
+  const GOLD = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]];
+  const KING = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+  const DIAG = [[-1,-1],[-1,1],[1,-1],[1,1]];
+  const ORTH = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  const sideOf = pc => (pc === pc.toUpperCase() ? 0 : 1);
+  const typeOf = pc => pc[pc.length - 1].toUpperCase();
+  const isProm = pc => pc.length === 2;
+  function pieceName(pc) {
+    const t = typeOf(pc);
+    if (t === 'K') return sideOf(pc) === 0 ? '王' : '玉';
+    return isProm(pc) ? PNAME[t] : NAME[t];
+  }
+  const sq = i => ZEN[9 - (i % 9)] + KAN[((i / 9) | 0) + 1];
+
+  function emptyHand() { return {R:0,B:0,G:0,S:0,N:0,L:0,P:0}; }
+  function parseSfen(sfen) {
+    const [bd, turnS, handS] = sfen.split(' ');
+    const b = new Array(81).fill(null);
+    let r = 0, c = 0;
+    for (let i = 0; i < bd.length; i++) {
+      const ch = bd[i];
+      if (ch === '/') { r++; c = 0; }
+      else if (/[1-9]/.test(ch)) c += +ch;
+      else { let pc = ch; if (ch === '+') { pc = '+' + bd[++i]; } b[r * 9 + c] = pc; c++; }
+    }
+    const h = [emptyHand(), emptyHand()];
+    if (handS && handS !== '-') {
+      let n = '';
+      for (const ch of handS) {
+        if (/[0-9]/.test(ch)) n += ch;
+        else { const cnt = n ? +n : 1; n = ''; h[ch === ch.toUpperCase() ? 0 : 1][ch.toUpperCase()] += cnt; }
+      }
+    }
+    return { b, h, turn: turnS === 'w' ? 1 : 0 };
+  }
+
+  function movesDef(t, prom) {
+    if (prom && 'PLNS'.includes(t)) return { steps: GOLD, slides: [] };
+    switch (t) {
+      case 'P': return { steps: [[-1,0]], slides: [] };
+      case 'L': return { steps: [], slides: [[-1,0]] };
+      case 'N': return { steps: [[-2,-1],[-2,1]], slides: [] };
+      case 'S': return { steps: [[-1,-1],[-1,0],[-1,1],[1,-1],[1,1]], slides: [] };
+      case 'G': return { steps: GOLD, slides: [] };
+      case 'K': return { steps: KING, slides: [] };
+      case 'B': return { steps: prom ? ORTH : [], slides: DIAG };
+      case 'R': return { steps: prom ? DIAG : [], slides: ORTH };
+    }
+  }
+  function targets(b, i) {
+    const pc = b[i], sg = sideOf(pc) === 0 ? 1 : -1, d = movesDef(typeOf(pc), isProm(pc));
+    const r = (i / 9) | 0, c = i % 9, out = [];
+    for (const [dr, dc] of d.steps) {
+      const nr = r + dr * sg, nc = c + dc * sg;
+      if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) out.push(nr * 9 + nc);
+    }
+    for (const [dr, dc] of d.slides) {
+      let nr = r + dr * sg, nc = c + dc * sg;
+      while (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+        out.push(nr * 9 + nc);
+        if (b[nr * 9 + nc]) break;
+        nr += dr * sg; nc += dc * sg;
+      }
+    }
+    return out;
+  }
+  const inZone = (me, r) => (me === 0 ? r <= 2 : r >= 6);
+  function mustPromote(me, t, tr) {
+    if (t === 'P' || t === 'L') return me === 0 ? tr === 0 : tr === 8;
+    if (t === 'N') return me === 0 ? tr <= 1 : tr >= 7;
+    return false;
+  }
+  function attackers(b, s, by) {
+    const out = [];
+    for (let i = 0; i < 81; i++) {
+      const pc = b[i];
+      if (pc && sideOf(pc) === by && targets(b, i).includes(s)) out.push(i);
+    }
+    return out;
+  }
+  function kingIndex(b, side) {
+    for (let i = 0; i < 81; i++) { const p = b[i]; if (p && typeOf(p) === 'K' && sideOf(p) === side) return i; }
+    return -1;
+  }
+  // 高速な利き判定: マスから外側へ逆向きに調べる
+  const pkey = pc => (pc.length === 2 ? '+' : '') + typeOf(pc);
+  const STEPSET = {}, SLIDESET = {};
+  ['P','L','N','S','G','B','R','K','+P','+L','+N','+S','+B','+R'].forEach(k => {
+    const d = movesDef(k[k.length - 1], k.length === 2);
+    STEPSET[k] = new Set(d.steps.map(([a, b]) => (a + 2) * 5 + (b + 2)));
+    SLIDESET[k] = new Set(d.slides.map(([a, b]) => (a + 1) * 3 + (b + 1)));
+  });
+  function attacked(b, s, by) {
+    const sg = by === 0 ? 1 : -1, r = (s / 9) | 0, c = s % 9;
+    for (let dr = -2; dr <= 2; dr++) {
+      for (let dc = -2; dc <= 2; dc++) {
+        if (!dr && !dc) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr > 8 || nc < 0 || nc > 8) continue;
+        const pc = b[nr * 9 + nc];
+        if (!pc || sideOf(pc) !== by) continue;
+        if (STEPSET[pkey(pc)].has((-dr * sg + 2) * 5 + (-dc * sg + 2))) return true;
+      }
+    }
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        let nr = r + dr, nc = c + dc;
+        while (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+          const pc = b[nr * 9 + nc];
+          if (pc) {
+            if (sideOf(pc) === by && SLIDESET[pkey(pc)].has((-dr * sg + 1) * 3 + (-dc * sg + 1))) return true;
+            break;
+          }
+          nr += dr; nc += dc;
+        }
+      }
+    }
+    return false;
+  }
+  function inCheck(st, side) {
+    const k = kingIndex(st.b, side);
+    return k >= 0 && attacked(st.b, k, 1 - side);
+  }
+  function apply(st, m) {
+    const b = st.b.slice(), me = st.turn;
+    const h = [Object.assign({}, st.h[0]), Object.assign({}, st.h[1])];
+    if (m.d) { b[m.t] = me === 0 ? m.d : m.d.toLowerCase(); h[me][m.d]--; }
+    else {
+      let pc = b[m.f];
+      const cap = b[m.t];
+      if (cap) h[me][typeOf(cap)]++;
+      b[m.f] = null;
+      if (m.p) pc = '+' + pc;
+      b[m.t] = pc;
+    }
+    return { b, h, turn: 1 - me };
+  }
+  function pseudo(st) {
+    const me = st.turn, b = st.b, out = [];
+    for (let i = 0; i < 81; i++) {
+      const pc = b[i];
+      if (!pc || sideOf(pc) !== me) continue;
+      const t = typeOf(pc), fr = (i / 9) | 0;
+      for (const to of targets(b, i)) {
+        const tp = b[to];
+        if (tp && sideOf(tp) === me) continue;
+        const tr = (to / 9) | 0;
+        const canProm = !isProm(pc) && 'PLNSBR'.includes(t) && (inZone(me, tr) || inZone(me, fr));
+        if (canProm) {
+          out.push({ f: i, t: to, p: true, d: null });
+          if (!mustPromote(me, t, tr)) out.push({ f: i, t: to, p: false, d: null });
+        } else out.push({ f: i, t: to, p: false, d: null });
+      }
+    }
+    for (const t of HAND_TYPES) {
+      if (!st.h[me][t]) continue;
+      for (let to = 0; to < 81; to++) {
+        if (b[to]) continue;
+        const tr = (to / 9) | 0, c = to % 9;
+        if (mustPromote(me, t, tr)) continue;
+        if (t === 'P') {
+          let dup = false;
+          for (let rr = 0; rr < 9; rr++) if (b[rr * 9 + c] === (me === 0 ? 'P' : 'p')) { dup = true; break; }
+          if (dup) continue;
+        }
+        out.push({ f: -1, t: to, p: false, d: t });
+      }
+    }
+    return out;
+  }
+  function legalMoves(st) {
+    const me = st.turn, out = [];
+    for (const m of pseudo(st)) {
+      const s2 = apply(st, m);
+      if (inCheck(s2, me)) continue;
+      if (m.d === 'P' && inCheck(s2, 1 - me) && legalMoves(s2).length === 0) continue; // 打ち歩詰め
+      out.push(m);
+    }
+    return out;
+  }
+
+  // ---- 詰み探索 ----
+  function canMate(st, n) {
+    const me = st.turn;
+    for (const m of legalMoves(st)) {
+      const s2 = apply(st, m);
+      if (!inCheck(s2, 1 - me)) continue;
+      const rep = legalMoves(s2);
+      if (rep.length === 0) return true;
+      if (n > 1 && rep.every(r => canMate(apply(s2, r), n - 1))) return true;
+    }
+    return false;
+  }
+  function mateLen(st, maxN) {
+    for (let k = 1; k <= maxN; k++) if (canMate(st, k)) return k;
+    return null;
+  }
+
+  // ---- 表記・解説 ----
+  function describe(st, m) {
+    const mark = st.turn === 0 ? '▲' : '△';
+    if (m.d) return mark + sq(m.t) + NAME[m.d] + '打';
+    const f = m.f;
+    return mark + sq(m.t) + pieceName(st.b[f]) + (m.p ? '成' : '') + '(' + (9 - (f % 9)) + (((f / 9) | 0) + 1) + ')';
+  }
+  function categorize(s2, r) {
+    if (r.d) return { k: 'block' };
+    const pc = s2.b[r.f];
+    if (typeOf(pc) === 'K') return s2.b[r.t] ? { k: 'kingcap', cap: pieceName(s2.b[r.t]), to: sq(r.t) } : { k: 'escape', to: sq(r.t) };
+    if (s2.b[r.t]) return { k: 'capture', cap: pieceName(s2.b[r.t]), by: pieceName(pc) };
+    return { k: 'block' };
+  }
+  function refuteText(rep) {
+    const c = rep.cat;
+    if (c.k === 'escape') return `玉が${c.to}へ逃げられます（そのマスが空いていて、攻め方の利きもありません）`;
+    if (c.k === 'kingcap') return `王手した${c.cap}に味方の利きがなく、玉に取られます`;
+    if (c.k === 'capture') return `王手した${c.cap}を${c.by}で取られます`;
+    return `合駒で王手の筋を止められます`;
+  }
+  function mateReason(s2) {
+    const def = s2.turn, att = 1 - def, b = s2.b;
+    const ki = kingIndex(b, def), bNo = b.slice(); bNo[ki] = null;
+    const r = (ki / 9) | 0, c = ki % 9, lines = [];
+    for (const [dr, dc] of KING) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr > 8 || nc < 0 || nc > 8) continue;
+      const j = nr * 9 + nc, pc = b[j];
+      if (pc && sideOf(pc) === def) { lines.push(`${sq(j)}：自分の${pieceName(pc)}があって動けない`); continue; }
+      const at = attackers(bNo, j, att);
+      if (pc && sideOf(pc) === att) {
+        lines.push(at.length ? `${sq(j)}：攻め方の${pieceName(pc)}は${pieceName(b[at[0]])}が守っていて取れない`
+                             : `${sq(j)}：攻め方の${pieceName(pc)}（王手の駒）`);
+      } else if (at.length) lines.push(`${sq(j)}：攻め方の${pieceName(b[at[0]])}(${sq(at[0])})が利いていて逃げられない`);
+    }
+    return lines;
+  }
+  function judge(st, m, n) {
+    const me = st.turn, info = { move: m, desc: describe(st, m) };
+    const s2 = apply(st, m);
+    info.after = s2;
+    if (!inCheck(s2, 1 - me)) { info.ok = false; info.kind = 'nocheck'; return info; }
+    const reps = legalMoves(s2);
+    if (reps.length === 0) { info.ok = true; info.mate = true; info.reasons = mateReason(s2); return info; }
+    const rr = reps.map(r => {
+      const s3 = apply(s2, r);
+      const len = n > 1 ? mateLen(s3, n - 1) : null;
+      return { r, desc: describe(s2, r), cat: categorize(s2, r), mate: len !== null, len, s3 };
+    });
+    info.replies = rr;
+    const refs = rr.filter(x => !x.mate);
+    if (!refs.length) { info.ok = true; info.mate = false; return info; }
+    info.ok = false; info.kind = 'escaped'; info.refs = refs;
+    return info;
+  }
+  function solutions(st, n) {
+    const out = [];
+    for (const m of legalMoves(st)) { const j = judge(st, m, n); if (j.ok) out.push(j); }
+    return out;
+  }
+  function whyIllegal(st, from, to, drop) {
+    const me = st.turn, b = st.b, tr = (to / 9) | 0, c = to % 9;
+    if (drop) {
+      if (b[to]) return '駒がある場所には打てません';
+      if (mustPromote(me, drop, tr)) return 'その駒は行き場がなくなるので打てません';
+      if (drop === 'P') {
+        for (let rr = 0; rr < 9; rr++) if (b[rr * 9 + c] === (me === 0 ? 'P' : 'p')) return '二歩です（同じ筋に自分の歩がある）';
+        const s2 = apply(st, { f: -1, t: to, p: false, d: 'P' });
+        if (inCheck(s2, 1 - me) && legalMoves(s2).length === 0) return '打ち歩詰めです（歩を打って詰ますのは反則）';
+      }
+      return 'そこには打てません';
+    }
+    const pc = b[from];
+    if (b[to] && sideOf(b[to]) === me) return '自分の駒があるマスには動けません';
+    if (!targets(b, from).includes(to)) return `${pieceName(pc)}はそこへ動けません`;
+    return 'その手は指せません（王手放置などの反則）';
+  }
+  return { attackers, attacked, parseSfen, legalMoves, apply, inCheck, canMate, mateLen, describe, judge, solutions, whyIllegal,
+           pieceName, sideOf, typeOf, isProm, sq, mustPromote, inZone, targets, HAND_TYPES, NAME, kingIndex };
+})();
+
+</script>
+<script>
+const KIF = (() => {
+  const S = SHOGI;
+  const FW = '１２３４５６７８９', KJ = '一二三四五六七八九';
+  const num = ch => { let i = FW.indexOf(ch); if (i >= 0) return i + 1; i = KJ.indexOf(ch); if (i >= 0) return i + 1; return /[1-9]/.test(ch) ? +ch : 0; };
+  const PN = { '歩': 'P', '香': 'L', '桂': 'N', '銀': 'S', '金': 'G', '角': 'B', '飛': 'R', '玉': 'K', '王': 'K',
+    'と': '+P', '成香': '+L', '成桂': '+N', '成銀': '+S', '馬': '+B', '龍': '+R', '竜': '+R', '杏': '+L', '圭': '+N', '全': '+S' };
+  const START = 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b -';
+  const MOVE_RE = /^(同[\s　]*|[１-９1-9][一二三四五六七八九1-9])(成香|成桂|成銀|[歩香桂銀金角飛玉王と馬龍竜全圭杏])(不成|成)?(打)?(?:\((\d)(\d)\))?/;
+  const END_RE = /^(投了|中断|詰み|千日手|持将棋|切れ負け|反則勝ち|反則負け|入玉勝ち|不戦勝|不戦敗|封じ手|time-up|%TORYO)/;
+  const USI_TOK = /^(?:[PLNSGBR]\*[1-9][a-i]|[1-9][a-i][1-9][a-i]\+?)$/;
+  const MATE_BASE = 31000; // 詰みは ±(31000-手数) で持つ
+
+  // 評価値コメント／infoの読み取り。
+  //   「score cp 123」「score mate 5」→ 手番側から見た値（USI形式）
+  //   「評価値=123」「eval:123」など    → 先手から見た値（KIFの評価値コメント）
+  function readEval(text) {
+    let v, stm;
+    let m = /\bscore\s+(cp|mate)\s+([+\-−]?\d+)/i.exec(text);
+    if (m) {
+      const n = parseInt(m[2].replace('−', '-'), 10);
+      if (m[1].toLowerCase() === 'mate') { if (!n) return null; v = (n > 0 ? 1 : -1) * (MATE_BASE - Math.min(Math.abs(n), 999)); }
+      else v = n;
+      stm = true;
+    } else {
+      m = /(?:評価値|score|eval)[=：:\s]*([+\-−]?\d+)/i.exec(text);
+      if (!m) return null;
+      v = parseInt(m[1].replace('−', '-'), 10); stm = false;
+    }
+    const pv = [], pm = /\bpv\s+(.+)$/.exec(text);
+    if (pm) for (const t of pm[1].trim().split(/\s+/)) { if (USI_TOK.test(t)) pv.push(t); else break; }
+    return { v, stm, pv };
+  }
+  // k手指した後の局面の評価として記録（先手から見た値に直す）
+  function setEval(out, k, r, force) {
+    if (!r) return;
+    const sente = r.stm ? (k % 2 === 0 ? r.v : -r.v) : r.v;
+    if (k === 0) { if (force || out.eval0 == null) out.eval0 = sente; }
+    else if (force || out.evals[k - 1] == null) out.evals[k - 1] = sente;
+    if (r.pv.length && (force || !out.pvs[k])) out.pvs[k] = r.pv;
+  }
+  const FILES = 'abcdefghi';
+  function toUsi(m) {
+    const sqn = i => (9 - (i % 9)) + FILES[(i / 9) | 0];
+    return m.d ? m.d + '*' + sqn(m.t) : sqn(m.f) + sqn(m.t) + (m.p ? '+' : '');
+  }
+  function usiMove(st, tok) {
+    let m = /^([PLNSGBR])\*([1-9])([a-i])$/.exec(tok);
+    if (m) return pick(st, -1, (m[3].charCodeAt(0) - 97) * 9 + (9 - +m[2]), false, m[1]);
+    m = /^([1-9])([a-i])([1-9])([a-i])(\+?)$/.exec(tok);
+    if (!m) return null;
+    return pick(st, (m[2].charCodeAt(0) - 97) * 9 + (9 - +m[1]), (m[4].charCodeAt(0) - 97) * 9 + (9 - +m[3]), !!m[5]);
+  }
+  function pvTextUsi(st, toks, n) {
+    const out = []; let s = st;
+    for (const t of toks.slice(0, n)) { const m = usiMove(s, t); if (!m) break; out.push(S.describe(s, m)); s = S.apply(s, m); }
+    return out.join(' ');
+  }
+
+  // ---- USIの通信ログ（position … / info … score … / bestmove …） ----
+  function readPosition(line) {
+    const pi = line.search(/(?:^|\s)position\s/);
+    if (pi < 0) return undefined;
+    const rest = line.slice(pi).trim().replace(/^position\s+/, '');
+    const mi = rest.search(/(?:^|\s)moves(?:\s|$)/);
+    const head = (mi >= 0 ? rest.slice(0, mi) : rest).trim();
+    const mv = mi >= 0 ? rest.slice(mi).trim().replace(/^moves\s*/, '') : '';
+    const ok = head === 'startpos' || /^sfen lnsgkgsnl\/1r5b1\/ppppppppp\/9\/9\/9\/PPPPPPPPP\/1B5R1\/LNSGKGSNL b/.test(head);
+    return ok ? mv.split(/\s+/).filter(Boolean) : null;
+  }
+  function isLog(text) { return /(?:^|\s)info\s[^\n]*\bscore\s+(?:cp|mate)\s/m.test(text) && /(?:^|\s)position\s/m.test(text); }
+  function movesFromLog(text) {
+    let best = null;
+    for (const raw of text.replace(/\r/g, '').split('\n')) { const t = readPosition(raw.trim()); if (t && (!best || t.length > best.length)) best = t; }
+    return best && best.length ? 'startpos moves ' + best.join(' ') : null;
+  }
+  function parseLog(text) {
+    const res = []; let cur = null;
+    const commit = () => { if (cur && cur.best) res.push({ toks: cur.toks, r: cur.best.r }); cur = null; };
+    for (const raw of text.replace(/\r/g, '').split('\n')) {
+      const line = raw.trim();
+      const pos = readPosition(line);
+      if (pos !== undefined) { commit(); cur = pos ? { toks: pos, best: null } : null; continue; }
+      if (!cur) continue;
+      const ii = line.search(/(?:^|\s)info\s/);
+      if (ii >= 0) {
+        const s = line.slice(ii);
+        if (/\b(?:lowerbound|upperbound)\b/.test(s)) continue;
+        const mp = /\bmultipv\s+(\d+)/.exec(s); if (mp && +mp[1] !== 1) continue;
+        if (!/\bscore\s+(?:cp|mate)\s/.test(s)) continue;
+        const r = readEval(s); if (!r) continue;
+        const d = /\bdepth\s+(\d+)/.exec(s), depth = d ? +d[1] : 0;
+        if (!cur.best || depth >= cur.best.depth) cur.best = { depth, r };
+        continue;
+      }
+      if (/(?:^|\s)bestmove\s/.test(line)) commit();
+    }
+    commit();
+    return res;
+  }
+  // 解析ログの評価値を棋譜に重ねる（手順が棋譜と合う局面だけ）
+  function mergeLog(out, text) {
+    const recs = parseLog(text), gu = out.moves.map(toUsi);
+    let used = 0, skipped = 0;
+    for (const rc of recs) {
+      const k = rc.toks.length;
+      if (k > gu.length || !rc.toks.every((t, i) => t === gu[i])) { skipped++; continue; }
+      setEval(out, k, rc.r, true); used++;
+    }
+    return { used, skipped };
+  }
+
+  function pick(st, f, t, p, d) {
+    const L = S.legalMoves(st);
+    return L.find(m => m.t === t && (d ? m.d === d : m.f === f && m.p === !!p)) || null;
+  }
+  function detect(text) {
+    if (/^[+-]\d{4}[A-Z]{2}/m.test(text) || /^[+-]00\d\d[A-Z]{2}/m.test(text)) return 'csa';
+    if (/手数|^\s*1\s+\S/m.test(text) || /[歩香桂銀金角飛]/.test(text)) return 'kif';
+    return 'usi';
+  }
+  function parse(text) {
+    text = text.replace(/\r/g, '');
+    const fmt = detect(text);
+    const out = { fmt, headers: {}, moves: [], descs: [], states: [], evals: [], pvs: {}, eval0: null, result: null, error: null };
+    let st = S.parseSfen(START);
+    out.states.push(st);
+    const push = (m, ev) => { out.descs.push(S.describe(st, m)); st = S.apply(st, m); out.moves.push(m); out.states.push(st); out.evals.push(ev); };
+    const fail = msg => { out.error = (out.moves.length + 1) + '手目: ' + msg; };
+
+    if (fmt === 'kif') {
+      let prevTo = -1;
+      for (const raw of text.split('\n')) {
+        const line = raw.trim();
+        if (!line) continue;
+        if (/^変化/.test(line)) break;
+        if (/^手合割/.test(line) && !/平手/.test(line)) { out.error = '平手以外の手合割には対応していません'; return out; }
+        const h = /^(先手|後手|下手|上手|対局日|開始日時|棋戦|戦型)[：:](.*)$/.exec(line);
+        if (h) { out.headers[h[1]] = h[2].trim(); continue; }
+        if (line[0] === '*') {
+          setEval(out, out.moves.length, readEval(line));
+          continue;
+        }
+        if (line[0] === '#' || line[0] === '&') continue;
+        const mm = /^(\d+)\s+(.+)$/.exec(line);
+        if (!mm) continue;
+        const body = mm[2];
+        const e = END_RE.exec(body);
+        if (e) { out.result = e[1]; break; }
+        const m = MOVE_RE.exec(body);
+        if (!m) { fail('読み取れない手「' + body.slice(0, 8) + '」'); return out; }
+        let to;
+        if (m[1][0] === '同') to = prevTo; else to = (num(m[1][1]) - 1) * 9 + (9 - num(m[1][0]));
+        if (to < 0) { fail('「同」の前の手がありません'); return out; }
+        const pt = PN[m[2]];
+        const drop = !!m[4];
+        const f = m[5] ? (num(m[6]) - 1) * 9 + (9 - num(m[5])) : -1;
+        const mv = drop ? pick(st, -1, to, false, pt) : pick(st, f, to, m[3] === '成');
+        if (!mv) { fail('「' + m[0] + '」は反則か、盤面と合いません'); return out; }
+        push(mv, null); prevTo = to;
+      }
+    } else if (fmt === 'csa') {
+      const CS = { FU: 'P', KY: 'L', KE: 'N', GI: 'S', KI: 'G', KA: 'B', HI: 'R', OU: 'K', TO: '+P', NY: '+L', NK: '+N', NG: '+S', UM: '+B', RY: '+R' };
+      for (const raw of text.split('\n')) {
+        const line = raw.trim();
+        if (line[0] === '*' || line[0] === "'") { setEval(out, out.moves.length, readEval(line)); continue; }
+        if (/^%/.test(line)) { out.result = line; break; }
+        const m = /^[+-](\d)(\d)(\d)(\d)([A-Z]{2})/.exec(line);
+        if (!m) continue;
+        const code = CS[m[5]], to = (+m[4] - 1) * 9 + (9 - +m[3]);
+        let mv;
+        if (m[1] === '0') mv = pick(st, -1, to, false, code);
+        else {
+          const f = (+m[2] - 1) * 9 + (9 - +m[1]);
+          const src = st.b[f];
+          const p = !!src && !S.isProm(src) && code.length === 2;
+          mv = pick(st, f, to, p);
+        }
+        if (!mv) { fail('「' + line.slice(0, 7) + '」は反則か、盤面と合いません'); return out; }
+        push(mv, null);
+      }
+    } else {
+      let t = text.replace(/^[\s\S]*?moves\s+/, '').split(/\s+/).filter(Boolean);
+      for (const tok of t) {
+        let mv;
+        let m = /^([PLNSGBR])\*([1-9])([a-i])$/.exec(tok);
+        if (m) mv = pick(st, -1, (m[3].charCodeAt(0) - 97) * 9 + (9 - +m[2]), false, m[1]);
+        else if ((m = /^([1-9])([a-i])([1-9])([a-i])(\+?)$/.exec(tok))) {
+          mv = pick(st, (m[2].charCodeAt(0) - 97) * 9 + (9 - +m[1]), (m[4].charCodeAt(0) - 97) * 9 + (9 - +m[3]), !!m[5]);
+        } else { fail('読み取れない手「' + tok.slice(0, 8) + '」'); return out; }
+        if (!mv) { fail('「' + tok + '」は反則か、盤面と合いません'); return out; }
+        push(mv, null);
+      }
+    }
+    return out;
+  }
+  return { parse, START, setEval, mergeLog, isLog, movesFromLog, usiMove, pvTextUsi, toUsi, readEval, parseLog, MATE_BASE };
+})();
+
+</script>
+<script>
+const ANA = (() => {
+  const S = SHOGI;
+  const V = { P: 100, L: 300, N: 350, S: 500, G: 550, B: 800, R: 1000, K: 0 };
+  const PV_ = { P: 700, L: 600, N: 600, S: 600, B: 1100, R: 1300 };
+  const MATE = 100000;
+  const val = pc => { const t = S.typeOf(pc); return S.isProm(pc) ? PV_[t] : V[t]; };
+  const hval = t => Math.round(V[t] * 1.1);
+
+  // 手番側から見た簡易評価（駒の価値＋歩の前進＋玉の守り）
+  function evalStatic(st) {
+    let e = 0;
+    for (let i = 0; i < 81; i++) {
+      const pc = st.b[i]; if (!pc) continue;
+      const s = S.sideOf(pc), r = (i / 9) | 0; let v = val(pc);
+      if (pc === 'P') v += 5 * (6 - r); else if (pc === 'p') v += 5 * (r - 2);
+      e += (s === 0 ? 1 : -1) * v;
+    }
+    for (const t of S.HAND_TYPES) e += hval(t) * (st.h[0][t] - st.h[1][t]);
+    for (let s = 0; s < 2; s++) {
+      const k = S.kingIndex(st.b, s); if (k < 0) continue;
+      const kr = (k / 9) | 0, kc = k % 9; let d = 0;
+      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+        const nr = kr + dr, nc = kc + dc; if (nr < 0 || nr > 8 || nc < 0 || nc > 8) continue;
+        const pc = st.b[nr * 9 + nc]; if (!pc || S.sideOf(pc) !== s) continue;
+        const t = S.typeOf(pc); if (t === 'G' || t === 'S') d++;
+      }
+      e += (s === 0 ? 1 : -1) * Math.min(d, 4) * 20;
+    }
+    return st.turn === 0 ? e : -e;
+  }
+  function order(st, moves) {
+    const b = st.b;
+    return moves.map(m => {
+      let sc = 0;
+      if (!m.d && b[m.t]) sc += 10 * val(b[m.t]) - val(b[m.f]) / 10;
+      if (m.p) sc += 300;
+      return [sc, m];
+    }).sort((a, c) => c[0] - a[0]).map(x => x[1]);
+  }
+  function quiesce(st, alpha, beta, qd) {
+    const stand = evalStatic(st);
+    if (stand >= beta) return stand;
+    if (stand > alpha) alpha = stand;
+    if (qd === 0) return stand;
+    const b = st.b;
+    const caps = S.legalMoves(st).filter(m => !m.d && b[m.t]);
+    for (const m of order(st, caps)) {
+      const sc = -quiesce(S.apply(st, m), -beta, -alpha, qd - 1);
+      if (sc >= beta) return sc;
+      if (sc > alpha) alpha = sc;
+    }
+    return alpha;
+  }
+  function search(st, depth, alpha, beta, ply) {
+    if (depth === 0) return { score: quiesce(st, alpha, beta, 2), pv: [] };
+    const moves = S.legalMoves(st);
+    if (!moves.length) return { score: -MATE + ply, pv: [] };
+    let best = { score: -Infinity, pv: [] };
+    for (const m of order(st, moves)) {
+      const r = search(S.apply(st, m), depth - 1, -beta, -alpha, ply + 1);
+      const sc = -r.score;
+      if (sc > best.score) best = { score: sc, pv: [m].concat(r.pv) };
+      if (sc > alpha) alpha = sc;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+  const cache = new Map();
+  const keyOf = (st, d) => st.b.map(x => x || '.').join('') + '|' + st.turn + JSON.stringify(st.h) + '|' + d;
+  function analyze(st, depth) {
+    const key = keyOf(st, depth);
+    if (cache.has(key)) return cache.get(key);
+    const res = [];
+    for (const m of order(st, S.legalMoves(st))) {
+      const r = search(S.apply(st, m), depth - 1, -Infinity, Infinity, 1);
+      res.push({ move: m, score: -r.score, pv: [m].concat(r.pv) });
+    }
+    res.sort((a, c) => c.score - a.score);
+    if (cache.size > 400) cache.clear();
+    cache.set(key, res);
+    return res;
+  }
+  const same = (a, b) => a.f === b.f && a.t === b.t && a.p === b.p && a.d === b.d;
+
+  // 取られそうか（守りがない、または安い駒で取られる）
+  function exposure(b, sq, owner) {
+    const pc = b[sq]; if (!pc || S.typeOf(pc) === 'K') return null;
+    const att = S.attackers(b, sq, 1 - owner); if (!att.length) return null;
+    const def = S.attackers(b, sq, owner), v = val(pc);
+    if (!def.length) return { kind: 'undef', v };
+    const cheap = att.filter(i => S.typeOf(b[i]) !== 'K').map(i => val(b[i]));
+    if (cheap.length && Math.min.apply(null, cheap) < v) return { kind: 'cheap', v };
+    return null;
+  }
+  const nm = pc => S.pieceName(pc);
+  const yen = v => Math.max(1, Math.round(v / 100));
+  function facts(st, m) {
+    const me = st.turn, op = 1 - me, s2 = S.apply(st, m), b0 = st.b, b2 = s2.b, F = [];
+    if (!m.d && b0[m.t]) F.push({ k: 'capture', v: val(b0[m.t]), t: nm(b0[m.t]) + 'を取って駒得（駒の価値の目安：歩＝1として約' + yen(val(b0[m.t])) + '）' });
+    if (m.p) F.push({ k: 'promote', v: 0, t: '成って' + nm(b2[m.t]) + 'になり、動きが強くなる' });
+    if (S.inCheck(s2, op)) F.push({ k: 'check', v: 0, t: '王手をかけて、相手の応手を限定する' });
+    const ex = exposure(b2, m.t, me);
+    if (ex) F.push({ k: 'hang', v: ex.v, t: S.sq(m.t) + 'の' + nm(b2[m.t]) + 'が、' + (ex.kind === 'undef' ? '守りがなく' : '安い駒で') + '取られる状態になる' });
+    for (let i = 0; i < 81; i++) {
+      if (i === m.t || !b2[i] || S.sideOf(b2[i]) !== me) continue;
+      const e2 = exposure(b2, i, me); if (!e2) continue;
+      const e0 = b0[i] === b2[i] ? exposure(b0, i, me) : null;
+      if (!e0) F.push({ k: 'hang', v: e2.v, t: S.sq(i) + 'の' + nm(b2[i]) + 'が取られる状態になる（この手で守りが外れたか、相手の利きが通る）' });
+      else F.push({ k: 'ignore', v: e2.v, t: S.sq(i) + 'の' + nm(b2[i]) + 'が取られそうなのに、そのままにしている' });
+    }
+    const th = [];
+    for (let i = 0; i < 81; i++) {
+      if (!b2[i] || S.sideOf(b2[i]) !== op) continue;
+      const e2 = exposure(b2, i, op); if (!e2) continue;
+      if (b0[i] === b2[i] && exposure(b0, i, op)) continue;
+      th.push({ k: 'threat', v: e2.v, t: S.sq(i) + 'の' + nm(b2[i]) + 'を狙っている（' + (e2.kind === 'undef' ? '守りがない' : '安い駒で取れる') + '）' });
+    }
+    th.sort((a, c) => c.v - a.v).slice(0, 2).forEach(x => F.push(x));
+    const mt = m.d || S.typeOf(b0[m.f]);
+    const ki = S.kingIndex(b2, me);
+    if ((mt === 'G' || mt === 'S') && ki >= 0) {
+      const cheb = i => Math.max(Math.abs(((i / 9) | 0) - ((ki / 9) | 0)), Math.abs((i % 9) - (ki % 9)));
+      if (cheb(m.t) <= 2 && (m.d || cheb(m.f) > 2)) F.push({ k: 'defense', v: 0, t: '玉の近くに' + nm(b2[m.t]) + 'を寄せて、守りを固める' });
+    }
+    return F;
+  }
+  function verdictOf(diff, isBest) {
+    if (isBest || diff <= 30) return { key: 'best', label: '最善に近い' };
+    if (diff <= 120) return { key: 'good', label: '差は小さい' };
+    if (diff <= 300) return { key: 'doubt', label: '損の可能性' };
+    return { key: 'bad', label: '損の可能性大' };
+  }
+  function explain(st, m, depth) {
+    const res = analyze(st, depth);
+    const idx = res.findIndex(x => same(x.move, m));
+    const played = res[idx], best = res[0];
+    const diff = best.score - played.score;
+    const v = verdictOf(diff, diff <= 0);
+    return { res, played, best, diff, verdict: v, factsPlayed: facts(st, m), factsBest: facts(st, best.move), top: res.slice(0, 3), depth };
+  }
+  function pvText(st, pv, n) {
+    const out = []; let s = st;
+    for (const m of pv.slice(0, n)) { out.push(S.describe(s, m)); s = S.apply(s, m); }
+    return out.join(' ');
+  }
+  function material(st) { // 先手から見た駒の損得だけの値
+    let e = 0;
+    for (let i = 0; i < 81; i++) { const pc = st.b[i]; if (pc) e += (S.sideOf(pc) === 0 ? 1 : -1) * val(pc); }
+    for (const t of S.HAND_TYPES) e += hval(t) * (st.h[0][t] - st.h[1][t]);
+    return e;
+  }
+  function pvSwing(st, pv) { // 読み筋の最後までの、指し手側から見た駒の損得
+    let s = st; for (const m of pv) s = S.apply(s, m);
+    const sg = st.turn === 0 ? 1 : -1;
+    return sg * (material(s) - material(st));
+  }
+  return { analyze, explain, facts, pvText, pvSwing, evalStatic, MATE };
+})();
+
+</script>
+<script>
+(function () {
+  'use strict';
+  const S = SHOGI;
+  const $ = id => document.getElementById(id);
+  const ORDER = ['R', 'B', 'G', 'S', 'N', 'L', 'P'];
+  const same = (a, b) => a.f === b.f && a.t === b.t && a.p === b.p && a.d === b.d;
+  const yen = v => Math.max(1, Math.round(v / 100));
+  const fmt = s => (Math.abs(s) > 50000 ? (s > 0 ? '詰みあり' : '詰まされる') : (s >= 0 ? '+' : '') + (s / 100).toFixed(1) + '歩');
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+
+  let G = null, tokExplain = 0;
+  G = { game: null, varLine: null, active: 'main', base: 0, k: 0, sel: null, promo: null, depth: 3, side: 0, ana: {}, eng: {}, busy: false, runTok: 0, moves: null, flip: false };
+  // 対局の状態
+  const M = { on: false, over: false, thinking: false, err: null, human: 0, ms: 1000, lvl: 10, id: 0 };
+  const live = () => M.on && !M.over;
+  function canAct() {
+    if (!live()) return true;
+    return G.active === 'main' && G.k === G.game.moves.length && curState().turn === M.human && !M.thinking;
+  }
+  function emptyGame(headers) { const g = KIF.parse(''); Object.assign(g.headers, headers || {}); return g; }
+
+  const line = () => (G.active === 'var' ? G.varLine : G.game);
+  const curState = () => line().states[G.k];
+  function legal() { if (!G.moves) G.moves = S.legalMoves(curState()); return G.moves; }
+
+  // ---- 外部エンジン（やねうら王など）の評価値 ----
+  const clampEv = v => Math.max(-3000, Math.min(3000, v));
+  const verdKey = d => d <= 30 ? { key: 'best', label: '最善に近い' } : d <= 120 ? { key: 'good', label: '差は小さい' } : d <= 300 ? { key: 'doubt', label: '損の可能性' } : { key: 'bad', label: '損の可能性大' };
+  function engNum(v) {
+    if (v === null || v === undefined) return '-';
+    if (Math.abs(v) >= 30000) { const n = KIF.MATE_BASE - Math.abs(v); return (v > 0 ? '先手の' : '後手の') + n + '手詰'; }
+    return (v > 0 ? '+' : '') + v;
+  }
+  // i手目で、指した側の評価値がどれだけ下がったか（正＝損）
+  function computeEng(g) {
+    const e = {};
+    for (let i = 1; i <= g.moves.length; i++) {
+      const after = g.evals[i - 1], before = i === 1 ? g.eval0 : g.evals[i - 2];
+      if (after == null || before == null) continue;
+      const drop = (i % 2 === 1 ? 1 : -1) * (clampEv(before) - clampEv(after));
+      e[i] = Object.assign({ drop }, verdKey(drop));
+    }
+    return e;
+  }
+  const engCount = g => g.evals.filter(v => v != null).length;
+
+  function loadText(text, startAt, logText) {
+    let log = logText || '';
+    $('loaderr').textContent = ''; $('logmsg').textContent = '';
+    if (KIF.isLog(text)) {
+      const ml = KIF.movesFromLog(text);
+      if (!ml) { $('loaderr').textContent = '解析ログの中に、平手からの「position startpos moves …」が見つかりませんでした。'; return false; }
+      log = text + '\n' + log; text = ml;
+    }
+    const g = KIF.parse(text);
+    if (!g.moves.length) { $('loaderr').textContent = g.error || '手が読み取れませんでした。形式を確かめてください。'; return false; }
+    if (g.error) $('loaderr').textContent = '途中まで読み込みました（' + g.error + '）';
+    let msg = '';
+    if (log.trim()) {
+      const r = KIF.mergeLog(g, log);
+      if (r.used) msg = '解析ログから' + r.used + '局面ぶんの評価値を取り込みました' + (r.skipped ? '（棋譜と手順が合わない' + r.skipped + '局面は無視しました）' : '') + '。';
+      else msg = '解析ログから評価値を取り込めませんでした。「position startpos moves …」と「info … score cp …」の行が必要です' + (r.skipped ? '（手順が棋譜と合わない局面が' + r.skipped + 'ありました）' : '') + '。';
+    }
+    const n = engCount(g);
+    if (n && !msg) msg = '棋譜の評価値コメントを' + n + '手ぶん読み取りました。';
+    $('logmsg').textContent = msg;
+    endMatchQuiet(); G.flip = false;
+    G.runTok++; G.busy = false;
+    G.game = g; G.eng = computeEng(g); G.varLine = null; G.active = 'main'; G.base = 0; G.k = Math.min(startAt || 0, g.moves.length);
+    G.sel = null; G.promo = null; G.ana = {}; G.moves = null;
+    $('bar').hidden = true; $('prog').textContent = '';
+    render(); return true;
+  }
+
+  function pcEl(pc) {
+    const d = el('div', 'pc' + (S.isProm(pc) ? ' prom' : '') + (S.sideOf(pc) === 1 ? ' gote' : ''), S.pieceName(pc));
+    return d;
+  }
+  function renderHand(box, side) {
+    box.textContent = side === 0 ? '先手の持ち駒 ' : '後手の持ち駒 ';
+    const st = curState(); let any = false;
+    ORDER.forEach(t => {
+      const c = st.h[side][t]; if (!c) return; any = true;
+      const mine = st.turn === side && canAct();
+      const b = el('button', 'hi' + (side === 1 ? ' gote' : '') + (mine ? ' mine' : '') + (G.sel && G.sel.d === t && st.turn === side ? ' sel' : ''));
+      b.appendChild(pcEl(side === 0 ? t : t.toLowerCase()));
+      if (c > 1) b.appendChild(el('b', '', '×' + c));
+      if (mine) b.onclick = () => { G.sel = (G.sel && G.sel.d === t) ? null : { d: t }; render(); }; else b.disabled = true;
+      box.appendChild(b);
+    });
+    if (!any) box.appendChild(document.createTextNode('なし'));
+  }
+  function renderBoard() {
+    const st = curState(), bd = $('board'); bd.textContent = '';
+    const dest = new Map();
+    if (G.sel) legal().forEach(m => { if (G.sel.d ? m.d === G.sel.d : m.f === G.sel.from) dest.set(m.t, 1); });
+    const L = line(), lastM = G.k > 0 ? L.moves[G.k - 1] : null;
+    for (let di = 0; di < 81; di++) {
+      const i = G.flip ? 80 - di : di;
+      const pc = st.b[i], c = el('button', 'cell');
+      if (lastM && (lastM.f === i || lastM.t === i)) c.classList.add('last');
+      if (G.sel && G.sel.from === i) c.classList.add('sel');
+      if (dest.has(i)) { c.classList.add('dest'); if (pc) c.classList.add('cap'); }
+      c.setAttribute('aria-label', S.sq(i) + (pc ? S.pieceName(pc) : ''));
+      if (pc) c.appendChild(pcEl(pc));
+      c.onclick = () => onCell(i);
+      bd.appendChild(c);
+    }
+    const f = $('files'), r = $('ranks'); f.textContent = ''; r.textContent = '';
+    const fl = '９８７６５４３２１'.split(''), rl = '一二三四五六七八九'.split('');
+    (G.flip ? fl.reverse() : fl).forEach(ch => f.appendChild(el('span', '', ch)));
+    (G.flip ? rl.reverse() : rl).forEach(ch => r.appendChild(el('span', '', ch)));
+  }
+  function renderMoves() {
+    const box = $('moves'), L = line(); box.textContent = '';
+    if (!L.moves.length) { box.textContent = 'まだ手がありません'; return; }
+    L.descs.forEach((d, i) => {
+      const inVar = G.active === 'var' && i >= G.base;
+      const b = el('button', 'mv' + (G.k === i + 1 ? ' cur' : '') + (inVar ? ' var' : ''), (i + 1) + ' ' + d);
+      b.setAttribute('role', 'listitem');
+      const onMain = G.active === 'main' || i < G.base;
+      const a = onMain ? (G.eng[i + 1] || G.ana[i + 1]) : null;
+      if (a) b.appendChild(el('i', a.key));
+      b.onclick = () => go(i + 1);
+      box.appendChild(b);
+    });
+    const cur = box.querySelector('.cur');
+    if (cur) { const t = cur.offsetTop - box.offsetTop; if (t < box.scrollTop || t + cur.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = Math.max(0, t - 30); }
+  }
+  function renderMeta() {
+    const g = G.game;
+    $('p-b').textContent = '先手：' + (g.headers['先手'] || g.headers['下手'] || '-');
+    $('p-w').textContent = '後手：' + (g.headers['後手'] || g.headers['上手'] || '-');
+    const n = line().moves.length;
+    $('pos').textContent = (G.k === 0 ? '開始局面' : G.k + '手目まで') + '（全' + n + '手' + (g.result ? '・' + g.result : '') + '）' + (G.active === 'var' ? ' ／ 検討中の変化' : '');
+    $('n-main').hidden = G.active !== 'var';
+    $('n-first').disabled = $('n-prev').disabled = G.k === 0;
+    $('n-next').disabled = $('n-last').disabled = G.k >= n;
+    $('promo').hidden = !G.promo;
+  }
+
+  function go(k) {
+    const n = line().moves.length;
+    G.k = Math.max(0, Math.min(n, k)); G.sel = null; G.promo = null; G.moves = null; render();
+  }
+  $('n-first').onclick = () => go(0);
+  $('n-prev').onclick = () => go(G.k - 1);
+  $('n-next').onclick = () => go(G.k + 1);
+  $('n-last').onclick = () => go(line().moves.length);
+  $('n-main').onclick = () => { const b = G.base; G.active = 'main'; G.varLine = null; go(Math.min(b, G.game.moves.length)); };
+  document.addEventListener('keydown', e => {
+    if (/TEXTAREA|INPUT/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowLeft') go(G.k - 1); else if (e.key === 'ArrowRight') go(G.k + 1);
+  });
+
+  function onCell(i) {
+    if (!canAct()) return;
+    const st = curState(), pc = st.b[i];
+    if (G.promo) return;
+    if (pc && S.sideOf(pc) === st.turn && !(G.sel && G.sel.from === i)) {
+      const dst = G.sel ? legal().filter(m => (G.sel.d ? m.d === G.sel.d : m.f === G.sel.from) && m.t === i) : [];
+      if (!dst.length) { G.sel = { from: i }; render(); return; }
+    }
+    if (!G.sel) return;
+    if (G.sel.from === i) { G.sel = null; render(); return; }
+    const c = legal().filter(m => (G.sel.d ? m.d === G.sel.d : m.f === G.sel.from) && m.t === i);
+    if (c.length === 1) { play(c[0]); return; }
+    if (c.length === 2) { G.promo = c; render(); return; }
+    $('card').textContent = '';
+    $('card').appendChild(el('p', 'err', S.whyIllegal(st, G.sel.d ? -1 : G.sel.from, i, G.sel.d || null)));
+  }
+  $('promo-yes').onclick = () => { const m = G.promo.find(x => x.p); G.promo = null; play(m); };
+  $('promo-no').onclick = () => { const m = G.promo.find(x => !x.p); G.promo = null; play(m); };
+
+  function play(m) {
+    const st = curState(), s2 = S.apply(st, m), desc = S.describe(st, m);
+    G.sel = null; G.moves = null;
+    if (live()) { if (!canAct()) return; commit(m); afterMove(); return; }
+    if (G.active === 'main' && G.k < G.game.moves.length && same(m, G.game.moves[G.k])) { G.k++; render(); return; }
+    let L;
+    if (G.active === 'var' && G.k >= G.base) {
+      L = G.varLine;
+      L.states.length = G.k + 1; L.moves.length = G.k; L.descs.length = G.k; L.evals.length = G.k;
+    } else {
+      const g = G.game;
+      L = G.varLine = { states: g.states.slice(0, G.k + 1), moves: g.moves.slice(0, G.k), descs: g.descs.slice(0, G.k), evals: g.evals.slice(0, G.k), headers: g.headers, result: null };
+      G.base = G.k; G.active = 'var';
+    }
+    L.moves.push(m); L.descs.push(desc); L.states.push(s2); L.evals.push(null);
+    G.k = L.moves.length; render();
+  }
+
+  // ---- 解説カード ----
+  function renderCard() {
+    const card = $('card'), k = G.k, L = line();
+    card.textContent = '';
+    if (k === 0) {
+      card.appendChild(el('h3', '', '手の解説'));
+      card.appendChild(el('p', 'note', live() ? '対局中です。解説は終局後に見られます。' : '棋譜を読み込むか、やねうら王と対局してみましょう。棋譜を ▶ で進めると、その手の良い点・問題点がここに出ます。'));
+      return;
+    }
+    if (live()) {
+      card.appendChild(el('h3', '', '対局中'));
+      card.appendChild(el('p', 'note', '手の解説や評価値は、終局後に見られます。'));
+      return;
+    }
+    const st = L.states[k - 1], m = L.moves[k - 1], tok = ++tokExplain, depth = G.depth;
+    const h = el('h3', '', k + '手目 ' + L.descs[k - 1]); card.appendChild(h);
+    card.appendChild(el('p', 'note', '簡易エンジンが読んでいます…'));
+    setTimeout(() => {
+      if (tok !== tokExplain) return;
+      const e = ANA.explain(st, m, depth);
+      if (tok !== tokExplain) return;
+      fillCard(card, h, st, m, e, k);
+    }, 20);
+  }
+  // やねうら王などの評価値・推奨手・読み筋
+  function engineBlock(card, k) {
+    const L = line(), g = G.game, main = G.active === 'main' || k <= G.base;
+    const after = L.evals[k - 1], before = k === 1 ? (main ? g.eval0 : null) : L.evals[k - 2];
+    const rec = main ? g.pvs[k - 1] : null, nxt = main ? g.pvs[k] : null;
+    if ((after == null) && !rec && !nxt) return;
+    const stB = L.states[k - 1], played = L.moves[k - 1];
+    card.appendChild(el('h4', '', '外部エンジン（やねうら王など）の解析'));
+    const u = el('ul');
+    if (after != null) {
+      const li = el('li', '', '評価値 ' + engNum(after) + '（先手から見た値）');
+      if (before != null) {
+        const d = (k % 2 === 1 ? 1 : -1) * (clampEv(before) - clampEv(after)), v = verdKey(d);
+        li.appendChild(document.createTextNode('　一手前 ' + engNum(before) + ' → ' + (d <= 30 && d > -30 ? 'ほぼ変化なし' : (d > 0 ? '指した側が約' + Math.round(d) + '下がる' : '指した側が約' + Math.round(-d) + '上がる')) + '　'));
+        li.appendChild(el('span', 'badge ' + v.key, v.label));
+      }
+      u.appendChild(li);
+    }
+    if (rec && rec.length) {
+      const bm = KIF.usiMove(stB, rec[0]);
+      if (bm) {
+        const same1 = same(bm, played);
+        u.appendChild(el('li', same1 ? 'pos' : 'neg', 'この局面の推奨手 ' + S.describe(stB, bm) + (same1 ? '（指した手と同じ）' : '（指した手と違います）') + '　読み筋：' + KIF.pvTextUsi(stB, rec, 6)));
+      }
+    }
+    if (nxt && nxt.length) {
+      const t = KIF.pvTextUsi(L.states[k], nxt, 6);
+      if (t) u.appendChild(el('li', '', 'この手のあとの読み筋：' + t));
+    }
+    card.appendChild(u);
+  }
+  function addList(card, title, items, cls) {
+    if (!items.length) return;
+    card.appendChild(el('h4', '', title));
+    const u = el('ul'); items.forEach(t => u.appendChild(el('li', cls, t))); card.appendChild(u);
+  }
+  function fillCard(card, h, st, m, e, k) {
+    while (card.childNodes.length > 1) card.removeChild(card.lastChild);
+    engineBlock(card, k);
+    const depth = e.depth;
+    h.appendChild(el('span', 'badge ' + e.verdict.key, e.verdict.label));
+    const best = e.best, bestDesc = S.describe(st, best.move);
+    card.appendChild(el('h4', '', '内蔵の簡易エンジンによる解説'));
+    card.appendChild(el('p', '', 'この手の評価 ' + fmt(e.played.score) + '　／　最善候補 ' + bestDesc + ' ' + fmt(best.score) + '　（手番側から見た値）'));
+    const F = e.factsPlayed, posK = ['capture', 'promote', 'check', 'threat', 'defense'], negK = ['hang', 'ignore'];
+    const goods = F.filter(f => posK.includes(f.k)).map(f => f.t);
+    const bads = F.filter(f => negK.includes(f.k)).map(f => f.t);
+    const swing = ANA.pvSwing(st, e.played.pv);
+    const missed = !m.d && st.b[m.t] ? null : (!best.move.d && st.b[best.move.t] && e.diff > 120 ? S.describe(st, best.move) + 'なら' + S.pieceName(st.b[best.move.t]) + 'を取れた（取れる駒の見逃し）' : null);
+    if (e.diff <= 120) {
+      addList(card, 'この手のよい点', goods.length ? goods : ['駒の損得では、目立った得も損もありません。形や囲いの良し悪しは、この簡易エンジンでは判断できません。'], 'pos');
+    } else {
+      const probs = bads.slice();
+      const rep = e.played.pv[1];
+      if (rep) { const s2 = S.apply(st, m); if (!rep.d && s2.b[rep.t]) probs.unshift('このあと、相手の最善の応手 ' + S.describe(s2, rep) + ' で' + S.pieceName(s2.b[rep.t]) + 'を取られる'); }
+      if (swing < -50) probs.push('読み筋（' + ANA.pvText(st, e.played.pv, depth + 1) + '）では、駒損（約' + yen(-swing) + '歩分）になる');
+      if (missed) probs.push(missed);
+      if (best.score > 50000 && e.played.score <= 50000) probs.push('詰みがあったのに逃している');
+      if (!probs.length) probs.push('数手先の読みで、最善候補より ' + (e.diff / 100).toFixed(1) + '歩分ほど評価が下がります（駒の損得以外の読み筋によります）');
+      addList(card, 'この手の問題点', probs, 'neg');
+      if (goods.length) addList(card, 'この手のよい面', goods, 'pos');
+    }
+    if (e.diff > 30) {
+      const bg = e.factsBest.filter(f => posK.includes(f.k)).map(f => f.t);
+      addList(card, '最善候補 ' + bestDesc + ' のねらい', bg.length ? bg : ['読み筋 ' + ANA.pvText(st, best.pv, depth + 1) + ' の駒の損得が、いちばん有利です'], 'pos');
+    }
+    const lines = e.top.map(x => S.describe(st, x.move) + '　' + fmt(x.score) + '　読み筋：' + ANA.pvText(st, x.pv.slice(0, depth + 1), depth + 1));
+    addList(card, '候補手ベスト3', lines);
+    card.appendChild(el('p', 'note', '※簡易エンジン（深さ' + e.depth + '）は、駒の損得と数手先の読みだけで評価します。囲いや大局観は見ないので、目安として使ってください。'));
+  }
+
+  // ---- グラフ ----
+  function renderGraph() {
+    const g = G.game, svg = $('graph'), N = g.moves.length, W = 600, H = 120;
+    const xs = i => 10 + (W - 20) * (i / Math.max(N, 1));
+    const ys = v => H / 2 - Math.max(-1500, Math.min(1500, v)) / 1500 * (H / 2 - 8);
+    const path = arr => { let d = '', pen = false; arr.forEach((v, i) => { if (v === null || v === undefined) { pen = false; return; } d += (pen ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + ys(v).toFixed(1); pen = true; }); return d; };
+    const a = [0], b = [g.eval0 == null ? null : g.eval0]; let hasB = g.eval0 != null;
+    for (let i = 1; i <= N; i++) { a.push(G.ana[i] ? G.ana[i].evalSente : null); const e = g.evals[i - 1]; b.push(e === null || e === undefined ? null : e); if (e !== null && e !== undefined) hasB = true; }
+    if (live()) hasB = false;
+    $('lg-b').hidden = !hasB;
+    const cx = xs(G.active === 'main' ? G.k : Math.min(G.k, G.base));
+    svg.innerHTML = '<line class="g-mid" x1="10" x2="' + (W - 10) + '" y1="' + H / 2 + '" y2="' + H / 2 + '"/>' +
+      (hasB ? '<path class="g-b" d="' + path(b) + '"/>' : '') + '<path class="g-a" d="' + path(a) + '"/>' +
+      '<line class="g-cur" x1="' + cx + '" x2="' + cx + '" y1="0" y2="' + H + '"/>' +
+      '<text class="g-t" x="12" y="12">先手有利</text><text class="g-t" x="12" y="' + (H - 4) + '">後手有利</text>';
+    svg.onclick = ev => { const r = svg.getBoundingClientRect(); const x = (ev.clientX - r.left) / r.width * W; const i = Math.round((x - 10) / (W - 20) * N); if (G.active === 'var') { G.active = 'main'; G.varLine = null; } go(Math.max(0, Math.min(N, i))); };
+  }
+
+  // ---- 全局解析 ----
+  function record(i, e, st, m) {
+    const sente = i % 2 === 1, sc = e.played.score;
+    const clamp = v => Math.max(-3000, Math.min(3000, v));
+    const F = e.factsPlayed, best = e.best;
+    let tag = null;
+    if (e.diff > 120) {
+      if (best.score > 50000 && sc <= 50000) tag = 'mate';
+      else if (F.some(f => f.k === 'hang' || f.k === 'ignore')) tag = 'hang';
+      else if (!best.move.d && st.b[best.move.t] && !(st.b[m.t] && !m.d)) tag = 'miss';
+      else tag = 'other';
+    }
+    const key = e.diff <= 30 ? 'best' : e.diff <= 120 ? 'good' : e.diff <= 300 ? 'doubt' : 'bad';
+    G.ana[i] = { key, diff: e.diff, evalSente: clamp(sente ? sc : -sc), tag, best: S.describe(st, best.move) };
+  }
+  function runAll() {
+    if (G.busy) { G.runTok++; G.busy = false; $('b-all').textContent = '全局を解析'; $('prog').textContent = '中止しました'; return; }
+    const g = G.game, N = g.moves.length, depth = G.depth, tok = ++G.runTok;
+    G.busy = true; G.ana = {}; $('b-all').textContent = '中止'; $('bar').hidden = false; $('summary').textContent = '';
+    let i = 1;
+    const step = () => {
+      if (tok !== G.runTok) return;
+      if (i > N) { G.busy = false; $('b-all').textContent = '全局を解析'; $('bar').hidden = true; $('prog').textContent = '解析が終わりました（深さ' + depth + '）'; renderSummary(); renderGraph(); renderMoves(); return; }
+      const e = ANA.explain(g.states[i - 1], g.moves[i - 1], depth);
+      record(i, e, g.states[i - 1], g.moves[i - 1]);
+      $('barfill').style.width = (i / N * 100) + '%'; $('prog').textContent = '解析中… ' + i + '/' + N + '手';
+      i++; setTimeout(step, 0);
+    };
+    step();
+  }
+  const ADVICE = {
+    hang: '指す前に「この駒に相手の利きがあるか・味方の守りは足りるか」を確認しましょう。駒の価値の目安は、歩1・香3・桂3.5・銀5・金5.5・角8・飛10です。',
+    miss: '相手の駒に自分の利きが通っていないか、毎手チェックする習慣をつけましょう。取れる駒は、まず取れないか考えます。',
+    mate: '王手を続けて詰むかどうかを、先に確認する習慣をつけましょう。詰将棋の練習が効きます。',
+    other: '駒の損得以外の読み筋で評価が下がった手です。局面を見直し、候補手ベスト3と比べてみましょう。'
+  };
+  const TAGN = { hang: '駒が取られる手・取られそうな駒の放置', miss: '取れる駒の見逃し', mate: '詰みの見逃し', other: 'その他（読みで損をした手）' };
+  function engineSummary(box) {
+    const g = G.game, idx = [];
+    for (let i = 1; i <= g.moves.length; i++) if ((i % 2 === 1) === (G.side === 0)) idx.push(i);
+    const have = idx.filter(i => G.eng[i]);
+    if (!have.length) return;
+    const cnt = { best: 0, good: 0, doubt: 0, bad: 0 };
+    let sum = 0;
+    have.forEach(i => { cnt[G.eng[i].key]++; sum += Math.max(0, G.eng[i].drop); });
+    box.appendChild(el('h4', '', 'やねうら王などの評価値による集計'));
+    box.appendChild(el('p', '', (G.side === 0 ? '先手' : '後手') + 'の' + idx.length + '手のうち' + have.length + '手を集計　平均の評価値ロス：約' + Math.round(sum / have.length)));
+    const st = el('div', 'stat');
+    [['best', '最善に近い'], ['good', '差は小さい'], ['doubt', '損の可能性'], ['bad', '損の可能性大']].forEach(([k, l]) => st.appendChild(el('span', 'badge ' + k, l + ' ' + cnt[k])));
+    box.appendChild(st);
+    const worst = have.filter(i => G.eng[i].drop > 120).sort((a, c) => G.eng[c].drop - G.eng[a].drop).slice(0, 5);
+    if (worst.length) {
+      box.appendChild(el('h4', '', '評価値が大きく下がった手'));
+      const w = el('div', 'worst');
+      worst.forEach(i => {
+        let rec = '';
+        const pv = g.pvs[i - 1];
+        if (pv && pv.length) { const bm = KIF.usiMove(g.states[i - 1], pv[0]); if (bm && !same(bm, g.moves[i - 1])) rec = '／推奨 ' + S.describe(g.states[i - 1], bm); }
+        const b = el('button', 'btn', i + '手目 ' + g.descs[i - 1] + '　（約' + Math.round(G.eng[i].drop) + '下がる' + rec + '）');
+        b.onclick = () => { if (G.active === 'var') { G.active = 'main'; G.varLine = null; } go(i); };
+        w.appendChild(b);
+      });
+      box.appendChild(w);
+    } else box.appendChild(el('p', 'note', '評価値が大きく下がった手はありませんでした。'));
+  }
+  function renderSummary() {
+    const box = $('summary'); box.textContent = '';
+    engineSummary(box);
+    const mine = Object.keys(G.ana).map(Number).filter(i => (i % 2 === 1) === (G.side === 0)).sort((a, c) => a - c);
+    if (!mine.length) { box.appendChild(el('p', 'note', '「全局を解析」を押すと、内蔵の簡易エンジンによる自分の手の評価と弱点がここに出ます。')); return; }
+    box.appendChild(el('h4', '', '内蔵の簡易エンジンによる集計'));
+    const cnt = { best: 0, good: 0, doubt: 0, bad: 0 }, tags = {};
+    mine.forEach(i => { cnt[G.ana[i].key]++; const t = G.ana[i].tag; if (t) tags[t] = (tags[t] || 0) + 1; });
+    const st = el('div', 'stat');
+    [['best', '最善に近い'], ['good', '差は小さい'], ['doubt', '損の可能性'], ['bad', '損の可能性大']].forEach(([k, l]) => st.appendChild(el('span', 'badge ' + k, l + ' ' + cnt[k])));
+    box.appendChild(el('p', '', (G.side === 0 ? '先手' : '後手') + 'の' + mine.length + '手の内訳'));
+    box.appendChild(st);
+    const tk = Object.keys(tags).sort((a, c) => tags[c] - tags[a]);
+    if (tk.length) {
+      box.appendChild(el('h4', '', '気をつけたいポイント'));
+      const u = el('ul'); tk.forEach(t => { const li = el('li', '', TAGN[t] + '：' + tags[t] + '回　' + ADVICE[t]); u.appendChild(li); }); box.appendChild(u);
+    } else box.appendChild(el('p', 'note', '簡易エンジンの読みの範囲では、大きな損はありませんでした。'));
+    const worst = mine.filter(i => G.ana[i].diff > 120).sort((a, c) => G.ana[c].diff - G.ana[a].diff).slice(0, 5);
+    if (worst.length) {
+      box.appendChild(el('h4', '', '見直したい手'));
+      const w = el('div', 'worst');
+      worst.forEach(i => { const b = el('button', 'btn', i + '手目 ' + G.game.descs[i - 1] + '　（最善候補 ' + G.ana[i].best + '）'); b.onclick = () => { if (G.active === 'var') { G.active = 'main'; G.varLine = null; } go(i); }; w.appendChild(b); });
+      box.appendChild(w);
+    }
+    box.appendChild(el('p', 'note', '※簡易エンジンによる目安です。やねうら王などの評価値を取り込めば、そちらも合わせて確認できます。'));
+  }
+
+  function render() { document.body.classList.toggle('flip', !!G.flip); renderMeta(); renderHand($('hand-top'), G.flip ? 0 : 1); renderBoard(); renderHand($('hand-bot'), G.flip ? 1 : 0); ynButtons(); renderMoves(); renderCard(); renderGraph(); if (!Object.keys(G.ana).length || !$('summary').firstChild) renderSummary(); }
+
+  document.querySelectorAll('input[name=depth]').forEach(r => r.onchange = () => { G.depth = +r.value; G.ana = {}; $('summary').textContent = ''; renderSummary(); render(); });
+  document.querySelectorAll('input[name=side]').forEach(r => r.onchange = () => { G.side = +r.value; renderSummary(); });
+  $('b-all').onclick = runAll;
+
+  // ---- やねうら王（PC上のUSIエンジン）につなぐ ----
+  const YN = { ws: null, eng: null, send: null, ready: false, busy: false, cb: null, tok: 0 };
+  function ynStatus(t, bad) { const e = $('yn-status'); e.textContent = t; e.className = bad ? 'err' : 'note'; const m = $('m-eng'); m.textContent = 'エンジン：' + t; m.className = bad ? 'err' : 'note'; }
+  function ynButtons() {
+    $('yn-one').disabled = !YN.ready || YN.busy || live(); $('yn-all').disabled = !YN.ready || live(); $('yn-conn').disabled = YN.busy || live(); $('yn-wasm').disabled = YN.busy || live();
+    $('m-start').disabled = !YN.ready || YN.busy || live(); $('m-resign').disabled = !live(); $('m-retry').hidden = !(live() && M.err && !M.thinking);
+    $('m-wasm').disabled = YN.busy || live(); $('m-conn').disabled = YN.busy || live(); $('m-kif').disabled = !G.game || !G.game.moves.length;
+  }
+  function ynLine(t) {
+    if (t === 'usiok') {
+      YN.send('setoption name Threads value ' + Math.max(1, Math.min(64, +$('yn-thr').value || 2)));
+      YN.send('setoption name USI_Hash value ' + Math.max(16, Math.min(8192, +$('yn-hash').value || 256)));
+      YN.send('setoption name MultiPV value 1');
+      YN.send('isready');
+    } else if (t === 'readyok') { YN.ready = true; ynStatus('やねうら王につながりました'); ynButtons(); }
+    if (YN.cb) YN.cb(t);
+  }
+  function ynReset() {
+    const ws = YN.ws, eng = YN.eng;
+    YN.ws = null; YN.eng = null; YN.send = null; YN.ready = false; YN.cb = null;
+    if (ws) { try { ws.close(); } catch (e) {} }
+    if (eng) { try { eng.terminate(); } catch (e) {} }
+    ynButtons();
+  }
+  // 方式A：PC上のやねうら王に、中継プログラム経由でつなぐ
+  function ynConnect() {
+    const url = $('yn-url').value.trim() || 'ws://localhost:8765';
+    ynReset(); ynStatus('接続中…');
+    let ws;
+    try { ws = new WebSocket(url); } catch (e) { ynStatus('接続先の形式が正しくありません（例：ws://localhost:8765）', true); return; }
+    YN.ws = ws;
+    ws.onopen = () => { YN.send = l => ws.send(l); ynStatus('エンジンの起動を確認中…'); ws.send('usi'); };
+    ws.onmessage = ev => { for (const l of String(ev.data).split('\n')) { const t = l.trim(); if (t) ynLine(t); } };
+    ws.onerror = () => { if (YN.ws === ws) ynStatus('つながりません。yane-bridge.js を起動しているか、接続先が合っているか確認してください。', true); };
+    ws.onclose = () => { if (YN.ws === ws) { YN.ready = false; YN.busy = false; YN.cb = null; ynButtons(); if (!$('yn-status').classList.contains('err')) ynStatus('切断されました'); } };
+  }
+  // 方式B：ブラウザの中でやねうら王（WASM版・水匠の評価関数入り）を動かす
+  const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mizarjp/yaneuraou.k-p@7.6.3-alpha.0/lib/';
+  async function ynConnectWasm() {
+    ynReset();
+    if (!window.crossOriginIsolated) {
+      ynStatus('このページは、ブラウザ内エンジンに必要な「クロスオリジン分離」の状態ではありません（SharedArrayBufferが使えません）。ファイルを直接開いた場合や、専用ヘッダのない場所では動きません。下の「やねうら王の評価値を使うには」の方法0を見てください。', true);
+      return;
+    }
+    YN.busy = true; ynButtons(); ynStatus('エンジンを読み込み中…（初回は数MBのダウンロードがあります）');
+    try {
+      const get = async f => { const r = await fetch(WASM_BASE + f); if (!r.ok) throw new Error(f + ' を取得できません（' + r.status + '）'); return r; };
+      const [js, wk, wasm] = await Promise.all([get('yaneuraou.k-p.js').then(r => r.text()), get('yaneuraou.k-p.worker.js').then(r => r.text()), get('yaneuraou.k-p.wasm').then(r => r.arrayBuffer())]);
+      const mainBlob = new Blob([js], { type: 'text/javascript' });
+      const workerUrl = URL.createObjectURL(new Blob([wk], { type: 'text/javascript' }));
+      await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = URL.createObjectURL(mainBlob); sc.onload = res; sc.onerror = () => rej(new Error('エンジンのスクリプトを実行できません')); document.head.appendChild(sc); });
+      if (typeof window.YaneuraOu_K_P !== 'function') throw new Error('エンジンの読み込み形式が想定と違います');
+      const eng = await window.YaneuraOu_K_P({ wasmBinary: wasm, mainScriptUrlOrBlob: mainBlob, locateFile: f => (/worker/.test(f) ? workerUrl : WASM_BASE + f) });
+      YN.eng = eng; YN.send = l => eng.postMessage(l); eng.addMessageListener(ynLine);
+      YN.busy = false; ynButtons(); ynStatus('エンジンを起動中…'); eng.postMessage('usi');
+    } catch (e) { YN.busy = false; ynButtons(); ynStatus('ブラウザ内エンジンを起動できませんでした：' + e.message, true); }
+  }
+  // 本譜のk手目まで進めた局面を解析し、評価値と読み筋を返す
+  function ynAnalyze(k, ms) {
+    return new Promise((res, rej) => {
+      const toks = G.game.moves.slice(0, k).map(KIF.toUsi);
+      let best = null, done = false;
+      const timer = setTimeout(() => { if (!done) { done = true; YN.cb = null; rej(new Error('エンジンから応答がありません')); } }, ms + 15000);
+      YN.cb = l => {
+        if (l.startsWith('info')) {
+          if (/\b(?:lowerbound|upperbound)\b/.test(l) || !/\bscore\s+(?:cp|mate)\s/.test(l)) return;
+          const mp = /\bmultipv\s+(\d+)/.exec(l); if (mp && +mp[1] !== 1) return;
+          const r = KIF.readEval(l); if (!r) return;
+          const d = /\bdepth\s+(\d+)/.exec(l), depth = d ? +d[1] : 0;
+          if (!best || depth >= best.depth) best = { depth, r };
+        } else if (l.startsWith('bestmove')) { if (!done) { done = true; clearTimeout(timer); YN.cb = null; res(best ? best.r : null); } }
+      };
+      YN.send('position startpos' + (toks.length ? ' moves ' + toks.join(' ') : ''));
+      YN.send('go movetime ' + ms);
+    });
+  }
+  function ynRefresh() { G.eng = computeEng(G.game); renderGraph(); renderMoves(); renderSummary(); }
+  async function ynOne() {
+    if (live()) return;
+    if (G.active === 'var') { $('yn-prog').textContent = '検討中の変化は解析できません。「本譜に戻る」を押してから実行してください。'; return; }
+    const k = G.k, ms = +$('yn-time').value; YN.busy = true; ynButtons(); $('yn-prog').textContent = k + '手目の局面を解析中…';
+    try {
+      const r = await ynAnalyze(k, ms);
+      if (r) { KIF.setEval(G.game, k, r, true); $('yn-prog').textContent = '解析しました'; } else $('yn-prog').textContent = 'この局面には評価値がありません（終局している可能性があります）';
+    } catch (e) { $('yn-prog').textContent = e.message; }
+    YN.busy = false; ynButtons(); ynRefresh(); renderCard();
+  }
+  async function ynAll() {
+    if (live()) return;
+    if (YN.busy) { YN.tok++; if (YN.send && YN.ready) YN.send('stop'); return; }
+    if (G.active === 'var') { $('yn-prog').textContent = '「本譜に戻る」を押してから実行してください。'; return; }
+    const g = G.game, N = g.moves.length, ms = +$('yn-time').value, tok = ++YN.tok;
+    YN.busy = true; $('yn-all').textContent = '中止'; $('yn-bar').hidden = false; ynButtons(); $('yn-all').disabled = false;
+    let n = 0, err = '';
+    for (let k = 0; k <= N; k++) {
+      if (tok !== YN.tok) break;
+      $('yn-fill').style.width = (k / N * 100) + '%'; $('yn-prog').textContent = 'やねうら王が解析中… ' + k + '/' + N + '手目の局面';
+      try { const r = await ynAnalyze(k, ms); if (tok !== YN.tok) break; if (r) { KIF.setEval(g, k, r, true); n++; } } catch (e) { err = e.message; break; }
+      if (k % 3 === 0 || k === N) ynRefresh();
+    }
+    YN.busy = false; $('yn-all').textContent = '全局をやねうら王で解析'; $('yn-bar').hidden = true; ynButtons();
+    $('yn-prog').textContent = err ? ('中断しました：' + err) : (tok !== YN.tok ? '中止しました（' + n + '局面を反映）' : '解析が終わりました（' + n + '局面）');
+    ynRefresh(); renderCard();
+  }
+  $('yn-conn').onclick = ynConnect; $('yn-wasm').onclick = ynConnectWasm; $('yn-iso').textContent = window.crossOriginIsolated ? 'ブラウザ内エンジン：このページで利用できます' : 'ブラウザ内エンジン：このページでは利用できません（専用ヘッダが必要）。PCの中継方式なら使えます。'; $('yn-one').onclick = ynOne; $('yn-all').onclick = ynAll; $('m-iso').textContent = $('yn-iso').textContent;
+
+  // ---- やねうら王と対局 ----
+  function matchMsg(t, bad) { const e = $('m-msg'); e.textContent = t; e.className = bad ? 'err' : 'note'; }
+  function endMatchQuiet() {
+    if (!M.on) return;
+    M.id++;
+    if (M.thinking && YN.send) { try { YN.send('stop'); } catch (e) {} }
+    M.on = false; M.over = false; M.thinking = false; M.err = null;
+  }
+  // 指し手を本譜に追加する
+  function commit(m) {
+    const g = G.game, n = g.moves.length, st = g.states[n], follow = G.k === n;
+    g.descs.push(S.describe(st, m)); g.moves.push(m); g.states.push(S.apply(st, m)); g.evals.push(null);
+    if (follow) G.k = n + 1;
+    G.sel = null; G.promo = null; G.moves = null;
+  }
+  function finish(text) {
+    const g = G.game; g.result = text; M.over = true; M.thinking = false; M.err = null;
+    G.eng = computeEng(g); G.sel = null; G.promo = null; G.moves = null;
+    render(); renderSummary();
+    matchMsg('対局終了：' + text + '。「全局をやねうら王で解析」で振り返りができます。');
+  }
+  function checkEnd() {
+    const g = G.game, n = g.moves.length, st = g.states[n];
+    if (!S.legalMoves(st).length) { finish(n + '手で詰み（' + (st.turn === M.human ? 'あなたの負け' : 'あなたの勝ち') + '）'); return true; }
+    const key = s => s.b.map(x => x || '.').join('') + '|' + s.turn + JSON.stringify(s.h), kk = key(st);
+    let c = 0; for (const s of g.states) if (key(s) === kk) c++;
+    if (c >= 4) { finish('千日手（引き分け）'); return true; }
+    if (n >= 320) { finish('320手に達したため引き分け'); return true; }
+    return false;
+  }
+  function afterMove() {
+    if (checkEnd()) return;
+    render();
+    if (curState().turn !== M.human) engineMove(); else matchMsg('あなたの手番です。');
+  }
+  // 局面（startposからの手順）をやねうら王に渡して、指し手を受け取る
+  function ynPlay(toks, ms) {
+    return new Promise((res, rej) => {
+      let best = null, done = false;
+      const timer = setTimeout(() => { if (!done) { done = true; YN.cb = null; rej(new Error('エンジンから応答がありません')); } }, ms + 20000);
+      YN.cb = l => {
+        if (l.startsWith('info')) {
+          if (/\b(?:lowerbound|upperbound)\b/.test(l) || !/\bscore\s+(?:cp|mate)\s/.test(l)) return;
+          const mp = /\bmultipv\s+(\d+)/.exec(l); if (mp && +mp[1] !== 1) return;
+          const r = KIF.readEval(l); if (!r) return;
+          const d = /\bdepth\s+(\d+)/.exec(l), depth = d ? +d[1] : 0;
+          if (!best || depth >= best.depth) best = { depth, r };
+        } else if (l.startsWith('bestmove')) {
+          if (!done) { done = true; clearTimeout(timer); YN.cb = null; res({ bm: (l.split(/\s+/)[1] || ''), r: best ? best.r : null }); }
+        }
+      };
+      YN.send('position startpos' + (toks.length ? ' moves ' + toks.join(' ') : ''));
+      YN.send('go movetime ' + ms);
+    });
+  }
+  async function engineMove() {
+    const id = M.id, g = G.game, k = g.moves.length;
+    M.thinking = true; M.err = null; YN.busy = true; ynButtons(); matchMsg('やねうら王が考えています…');
+    let out = null, err = '';
+    try { out = await ynPlay(g.moves.map(KIF.toUsi), M.ms); } catch (e) { err = e.message; }
+    YN.busy = false;
+    if (id !== M.id) { ynButtons(); return; }
+    M.thinking = false;
+    if (err) { M.err = err; render(); matchMsg('やねうら王から手を受け取れませんでした：' + err + '（接続を確かめて「もう一度考えさせる」を押してください）', true); return; }
+    if (out.r) KIF.setEval(g, k, out.r, true);
+    const bm = out.bm;
+    if (bm === 'resign') { finish('やねうら王の投了（あなたの勝ち）'); return; }
+    if (bm === 'win') { finish('やねうら王の入玉宣言勝ち（あなたの負け）'); return; }
+    const mv = KIF.usiMove(g.states[k], bm);
+    if (!mv) { M.err = 'bad'; render(); matchMsg('やねうら王の手「' + bm + '」を、この盤の規則で読み取れませんでした。もう一度考えさせるか、投了してください。', true); return; }
+    commit(mv); afterMove();
+  }
+  function startMatch() {
+    if (!YN.ready) { matchMsg('先にやねうら王につないでください。', true); return; }
+    if (YN.busy || live()) return;
+    const human = +document.querySelector('input[name=mside]:checked').value;
+    M.id++; Object.assign(M, { on: true, over: false, thinking: false, err: null, human, ms: +$('m-time').value, lvl: +$('m-lvl').value });
+    G.runTok++; G.busy = false; $('b-all').textContent = '全局を解析'; $('bar').hidden = true; $('prog').textContent = ''; $('yn-prog').textContent = '';
+    G.game = emptyGame({ '先手': human === 0 ? 'あなた' : 'やねうら王', '後手': human === 1 ? 'あなた' : 'やねうら王' });
+    G.eng = {}; G.ana = {}; G.varLine = null; G.active = 'main'; G.base = 0; G.k = 0; G.sel = null; G.promo = null; G.moves = null; G.flip = human === 1;
+    $('summary').textContent = ''; $('loaderr').textContent = ''; $('logmsg').textContent = ''; $('loader').open = false;
+    YN.send('setoption name SkillLevel value ' + M.lvl); YN.send('usinewgame');
+    render();
+    if (human === 1) engineMove(); else matchMsg('対局開始です。あなたは先手です。盤をタップして指してください。');
+  }
+  function resign() {
+    if (!live()) return;
+    M.id++;
+    if (M.thinking && YN.send) { try { YN.send('stop'); } catch (e) {} }
+    finish('あなたの投了（負け）');
+  }
+  function exportKif() {
+    const g = G.game, n = g.moves.length;
+    const L = ['手合割：平手', '先手：' + (g.headers['先手'] || ''), '後手：' + (g.headers['後手'] || ''), '手数----指手---------'];
+    g.descs.forEach((d, i) => L.push((i + 1) + ' ' + d.slice(1)));
+    if (g.result && /投了/.test(g.result)) L.push((n + 1) + ' 投了');
+    const t = L.join('\n');
+    $('src').value = t; $('loader').open = true;
+    const done = () => matchMsg('棋譜を読み込み欄（上）に入れました。コピーして保存できます。');
+    try { navigator.clipboard.writeText(t).then(() => matchMsg('棋譜をコピーしました（読み込み欄にも入れてあります）。'), done); } catch (e) { done(); }
+  }
+  $('m-wasm').onclick = () => ynConnectWasm();
+  $('m-conn').onclick = () => ynConnect();
+  $('m-start').onclick = startMatch;
+  $('m-resign').onclick = resign;
+  $('m-retry').onclick = () => { if (live() && !M.thinking) engineMove(); };
+  $('m-kif').onclick = exportKif;
+  $('b-load').onclick = () => { const t = $('src').value.trim(); if (!t) { $('loaderr').textContent = '棋譜のテキストを貼り付けてください。'; return; } if (loadText(t, 0, logValue())) $('loader').open = false; };
+  function readFile(f, cb) {
+    const rd = new FileReader();
+    rd.onload = () => {
+      let t; const buf = rd.result;
+      try { t = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { try { t = new TextDecoder('shift_jis').decode(buf); } catch (e2) { t = ''; } }
+      cb(t);
+    };
+    rd.readAsArrayBuffer(f);
+  }
+  $('file').onchange = ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    readFile(f, t => { $('src').value = t.length > 100000 ? '' : t; if (loadText(t, 0, logValue())) $('loader').open = false; });
+  };
+  $('file2').onchange = ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    readFile(f, t => {
+      G.pendingLog = t; $('log').value = t.length > 100000 ? '（' + f.name + ' を読み込みました：' + t.length.toLocaleString() + '文字）' : t;
+      if ($('src').value.trim() && loadText($('src').value.trim(), 0, t)) $('loader').open = false;
+      else $('logmsg').textContent = '解析ログを読み込みました。棋譜を貼り付けて「読み込む」を押してください。';
+    });
+  };
+  $('log').oninput = () => { G.pendingLog = null; };
+  const logValue = () => (G.pendingLog != null ? G.pendingLog : $('log').value);
+  // 起動時は空の盤（平手の初期配置）
+  G.game = emptyGame(); G.eng = {};
+  render();
+})();
+</script>
+
+</body></html>
